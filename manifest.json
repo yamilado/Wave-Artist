@@ -1,0 +1,16 @@
+{
+  "manifest_version": 2,
+  "name": "Wave Artist",
+  "short_name": "Wave Artist",
+  "author": "L. Yamil Martínez",
+  "description": "Make original paintings with a funny wave's simulator. Set, draw and enjoy.",
+  "version": "0.0.0.1",
+  "kiosk_enabled": false,
+  "app": {
+    "background": {
+      "scripts": ["main.js"]
+    }
+  },
+  "icons": { "16": "waveartist16.png", "128": "waveartist128.png" },
+  "permissions": ["storage"]
+}

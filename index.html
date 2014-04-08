@@ -1,0 +1,196 @@
+<html ng-app ng-csp>
+<!--
+/*-----------------------------------------------------*/
+/*- Wave Artist v.0.0.0.1                 24-feb-2014 -*/
+/*- Copyright (c) 2014 L.Yamil Martinez (G+ yamilado) -*/
+/*- Licensed under The Artistic License 2.0           -*/
+/*-----------------------------------------------------*/-->
+    <head>
+        <script src="angular.min.js"></script>
+        <script src="controller.js"></script>
+        <link rel="stylesheet" href="waveartist.css">
+    </head>
+    <body ng-controller="WAController">
+        <div class="waveartist">Wave Artist</div>
+        <header></header>
+        <aside>
+            <nav class="simTools">
+                <div class="menu">
+                    <span>
+                        <div class="submenu showSubMenu{{currentMenu=='stop' && showSubMenu}}">
+                            <a href ng-click="clickMenu('clear')">clear</a>
+                        </div>
+                        <a href ng-click="clickMenu('stop')">stop</a>
+                    </span>
+                    <span>
+                        <div class="submenu showSubMenu{{currentAction=='play'}}">
+                            <a href ng-click="clickSubMenu('pause')" ng-class="{active: paused};">pause</a>
+                        </div>
+                        <a href ng-click="clickMenu('play')" ng-class="{active: currentAction=='play'};">play</a>
+                    </span>
+                    <span>
+                        <div class="submenu showSubMenu{{currentAction=='movement'}}">
+                            <a href ng-click="clickSubMenu('pauseMove')" ng-class="{active: paused};">pause</a>
+                        </div>
+                        <a href ng-click="clickMenu('movement')" ng-class="{active: currentAction=='movement'};" ng-show="params.effect_movement">wave&nbsp;it</a>
+                    </span>
+                </div>
+                <div class="fondo"></div>
+                <div class="title" title="Play to view how react the waves in the scenario. You can change the figures on the scenario while playing. And if the movement effect is checked, you can animate the wave after play.">let's go!</div>
+            </nav>
+
+            <nav class="drawTools">
+                <div class="menu">
+                    <span>
+                        <div class="submenu showSubMenu{{currentMenu=='figure' && showSubMenu}}">
+                            <a href ng-click="clickSubMenu('square')">square</a>
+                            <a href ng-click="clickSubMenu('hexagon')">hexagon</a>
+                            <a href ng-click="clickSubMenu('circle')">circle</a>
+                        </div>
+                        <a href ng-click="clickMenu('figure')">figure</a>
+                    </span>
+                    <span>
+                        <div class="submenu showSubMenu{{currentMenu=='lines' && showSubMenu}}">
+                            <a href ng-click="clickSubMenu('closed')">closed</a>
+                            <a href ng-click="clickSubMenu('opened')">opened</a>
+                        </div>
+                        <a href ng-click="clickMenu('lines')" ng-class="{active: currentMenu=='lines'}">lines</a>
+                    </span>
+                    <span>
+                        <div class="submenu showSubMenu{{currentMenu=='select' && showSubMenu}}">
+                            <a href ng-click="clickSubMenu('move')">move</a>
+                            <a href ng-click="clickSubMenu('duplicate')">duplicate</a>
+                            <a href ng-click="clickSubMenu('divide')" ng-hide="currentAction=='play'">cut&nbsp;half</a>
+                            <a href ng-click="clickSubMenu('delete')" ng-hide="currentAction=='play'">delete</a>
+                        </div>
+                        <a href ng-click="clickMenu('select')" ng-class="{active: currentMenu=='select'}">select</a>
+                    </span>
+                </div>
+                <div class="fondo"></div>
+                <div class="title" title="Put elements with this single vectorial drawing tool. The waves will be collision with they when you play it.">draw</div>
+            </nav>
+            
+            <nav class="paramsTools">
+                <a href ng-click="toggleDialog('parameters')">Parameters</a>
+                <a href ng-click="clickMenu('origin')" ng-class="{active: currentMenu=='origin'};" ng-init="num_origin=1;">origin {{num_origin}}</a>
+                <div class="fondo"></div>
+                <div class="title" title="Enter the parameters to customize the waves, or set the origin where each wave should start.">set</div>
+            </nav>
+            
+        </aside>
+        
+        <main>
+            <canvas id="pool" height="{{POOL_HEIGHT}}" width="{{POOL_WIDTH}}" style="background-color:{{params.color_back}}"></canvas>    
+        </main>
+        <canvas id="drawingpool" ng-click="drawingClick($event)" ng-mousemove="drawingMove($event)" height="{{POOL_HEIGHT}}" width="{{POOL_WIDTH}}"></canvas>
+        
+        <footer>
+            <a href ng-click="toggleDialog('about')">{{credits}}</a>
+        </footer>
+        
+        <div class="crossline"></div>
+        
+        <div class="drawingTools showDrawTools{{currentMenu=='origin' || currentMenu=='figure' || currentMenu=='lines' || currentMenu=='select'}}">
+            <span>{{drawInfo}}</span>
+            <span class="tools" ng-show="currentMenu=='select' && showSubMenu">
+                <span>
+                    size. -<input ng-model="figure_size" ng-init="figure_size=100" ng-change="figureSize()" type="range" max="2000" min="30" step="10" title="{{figure_size}}%">+
+                </span>
+                <span>
+                    angle. L<input ng-model="figure_angle" ng-init="figure_angle=0" ng-change="figureAngle()" type="range" max="180" min="-180" step="5" title="{{figure_angle}}º">R
+                </span>
+            </span>
+        </div>
+
+        <div class="screenDialog showDialog{{showDialog!=''}}">
+            <div class="parameters" ng-show="showDialog=='parameters'">
+                <form ng-submit="setParams() || save()">
+                    <fieldset>
+                        <legend>Waves</legend>
+                        <div class="row" title="Simultaneous waves to play.">
+                            <span>Origins</span> 
+                            <input ng-model="params.origins" type="number" max="10" min="1" step="1">
+                        </div>
+                        <div class="row" title="Delay between waves start time in pixels.">
+                            <span>Timelapse</span>
+                            <input ng-model="params.timelapse" type="number" max="1000" min="1" step="1">
+                        </div>
+                        <div class="row" title="Number of particles that compose each wave.">
+                            <span>Resolution</span> 
+                            <input ng-model="params.resolution" type="number" max="12000" min="8" step="64">
+                        </div>
+                        <div class="row" title="Distance between crests or width of color gradation in pixels.">
+                            <span>Length</span> 
+                            <input ng-model="params.wlength" type="number" max="100000" min="2" step="1">
+                        </div>
+                        <div class="row" title="The wave will ends after reach this radius length or distance from origin in pixels.">
+                            <span>End radius</span>
+                            <input ng-model="params.end_radius" type="number" max="10000" min="50" step="10">
+                        </div>
+                    </fieldset>
+                    <fieldset
+                        style="background-image: linear-gradient(45deg, transparent 79%, {{params.color_trough}} 80%, {{params.color_back}} 84%, {{params.color_crest}} 88%, {{params.color_back}} 92%, {{params.color_trough}} 96%, {{params.color_back}} 100%);">
+                        <legend>Colors</legend>
+                        <div class="row">
+                            <span>Background</span>
+                            <input ng-model="params.color_back" type="color">
+                        </div>
+                        <div class="row">
+                            <span>Wave crest</span>
+                            <input ng-model="params.color_crest" type="color">
+                        </div>
+                        <div class="row">
+                            <span>Wave trough</span>
+                            <input ng-model="params.color_trough" type="color">
+                        </div>
+                        <!-- <div class="row">
+                            <span>Transparency</span> 
+                            <input ng-model="params.color_transparency" type="number" max="255" min="1" step="1">
+                        </div> -->
+                    </fieldset>
+                    <fieldset>
+                        <legend>Effects</legend>
+                        <!-- <div class="row">
+                            <span>Pool border</span>
+                            <input ng-model="params.effect_pool_border" type="checkbox">
+                        </div> -->
+                        <div class="row">
+                            <span>Wake</span>
+                            <input ng-model="params.effect_wake" type="checkbox">
+                        </div>
+                        <div class="row" ng-show="params.effect_wake && !params.effect_plasma && !params.effect_attenuation" title="Simulate water waves.">
+                            <span>Water</span>
+                            <input ng-model="params.effect_water" type="checkbox">
+                        </div>
+                        <div class="row" ng-show="params.effect_wake && !params.effect_plasma && !params.effect_attenuation" title="Allow simulating of the wave's movement.">
+                            <span>Movement</span>
+                            <input ng-model="params.effect_movement" type="checkbox">
+                        </div>
+                        <div class="row" ng-show="params.effect_wake && !params.effect_water && !params.effect_movement" title="Cool color effect.">
+                            <span>Plasma</span>
+                            <input ng-model="params.effect_plasma" type="checkbox">
+                        </div>
+                        <div class="row" ng-show="params.effect_wake && !params.effect_water && !params.effect_movement" title="Progresive wave color attenuation.">
+                            <span>Attenuation</span>
+                            <input ng-model="params.effect_attenuation" type="checkbox">
+                        </div>
+                    </fieldset>
+    
+                    <input class="btn-primary" type="submit" value="close" ng-click="toggleDialog('parameters')">
+                </form>
+            </div>
+
+            <div class="about" ng-show="showDialog=='about'" ng-click="toggleDialog('about')">
+                <span class="waveartist title">{{appName}}</span>
+                <span class="version">v. {{appVersion}}</span>
+                <span class="EULA">{{appEULA}}</span>
+                <span class="comment">{{appComment}}</span>
+                <span class="author">{{appAuthor}}</span>
+                <span class="contact">{{appContact}}</span>
+                <span class="web">{{appWeb}}</span>
+            </div>
+
+        </div>
+        
+    </body>
+</html>
