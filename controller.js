@@ -6,75 +6,164 @@
 
 function WAController($scope) {
     //about
+    $scope.credits="about";
     $scope.appName='Wave Artist';
-    $scope.appVersion='0.0.0.1';
+    $scope.appVersion='0.0.0.2';
     $scope.appAuthor='L. Yamil';
     $scope.appContact='G+ yamilado';
     $scope.appWeb='';
     $scope.appEULA='Artistic License 2.0';
     $scope.appComment="Dedicated to my daughter, family and friends for their support. Thanks.";
     //constants
+    var PI=Math.PI;
+    var XMA=799;
+    var YMA=549;
+    var XYMA=2000; //>sqrt(XMA^2+YMA^2)
+    var FIGURE_SETS={ square:4, hexagon:6, circle:50 }; //predefined set of figures with their lines' number
+
+    $scope.POOL_WIDTH=XMA+1;
+    $scope.POOL_HEIGHT=YMA+1;
+    $scope.MAXORIGINS=10;
+
+	//scoped variables
     $scope.showDialog='';
     $scope.num_origin=1;
     $scope.currentAction='';
     $scope.currentMenu='';
     $scope.currentSubMenu='';
     $scope.showSubMenu=false;
-    $scope.credits="about";
     $scope.drawInfo="";
     $scope.paused=false;
 
-    var PI=Math.PI; //3.141592;
-    $scope.POOL_WIDTH=800;
-    $scope.POOL_HEIGHT=550;
-    var XMA=799;
-    var YMA=549;
-    var XYMA=2000; //>sqrt(XMA^2+YMA^2)
-    $scope.MAXORIGINS=10;
-    
-    //prototypes and arrays
-    var Dibujo={x1:0,y1:0,x2:0,y2:0,xp:0,yp:0, mouseX:($scope.POOL_WIDTH/2),mouseY:($scope.POOL_HEIGHT/2), firstLine:false, poolBorder:false, color:'#ff0000', action:'', selectedFigure:null };
-    
-    var punto={x:0, y:0};
-    //var nextOV=[];
-    var OV=[[]];
-    
-    var particle={ B:0.0, next_B:0.0, x:0.0, y:0.0, cd:0.0, M:0.0, Mx:0, My:0, iFigure:0, iLine:0 };
-    var OND=[[]];
-    var clsC={ B:0.0, x:($scope.POOL_WIDTH/2), y:($scope.POOL_HEIGHT/2), cd:0.0, M:0.0 };
-    var C;//array with origin params
-    
-    var line={ x0:0, y0:0, x1:0, y1:0, rad:0.0, len:0.0, oRad:0.0, oLen:0.0, absorption:0 };
-    var figures=[[]];
-    var figureDefinitions={square:4, hexagon:6, circle:50 };
-
+    //prototypes
     var colorRGBa={ R:0, G:0, B:0, a:255 };
-    //var colorOndaRGBa=Object.create(colorRGBa);
-    var virtualpalette=[];
-    //vars
-    var cuenta=0, col=0;
+
+    var point={x:0, y:0}; 
+
+    var particle={ 
+		B:0.0, //direction angle (rad)
+		next_B:0.0, //next direction angle after collision
+		x:0.0, y:0.0, //actual position
+		cd:0.0, //collisioned line angle (rad)
+		M:0.0, //distance to collision point in pixels
+		Mx:0, My:0, //collision point
+		iFigure:0, //index of collision figure
+		iLine:0 //index of collision line (of the figure)
+	};
+	
+    var poolCenterPoint={ 
+		x:($scope.POOL_WIDTH/2), y:($scope.POOL_HEIGHT/2), 
+	};
+
+    var line={ 
+		x0:0, y0:0, //start point
+		x1:0, y1:0, //end point
+		rad:0.0, //actual line angle (rad)
+		len:0.0, //actual line length in pixels
+		oRad:0.0, //original line angle (rad)
+		oLen:0.0, //original line length in pixels
+		absorption:0 //future use
+	};
+
+	//global arrays
+    var waves=[[]]; //waves and particles
+    
+    var wavesPosBuffer=[[]]; //waves and particles' position only buffer
+    
+	var origins; //origin points
+    
+    var figures=[[]]; //drawed figures
+
+    var virtualpalette=[]; //wave color palette
+
+	//canvas used for wave simulation 
     var canvas = document.getElementById("pool");
     var cpool = canvas.getContext("2d");
-    var cpoolData;//=[16];
+    var cpoolData;
 
+	//canvas used for drawing
     var canvasd = document.getElementById("drawingpool");
     var cdrawing = canvasd.getContext("2d");
     var cdrawingData;
     
-    //animation frame;
-    var idAniSimula=null;
-    var idAniMove=null;
+    //animation variables
+    var afSimulation=null;
+    var afMovement=null;
+    var idTimer;
     
-    //params  op
-    var op;
-    $scope.params = {resolution:6000, wlength:50, origins:1, timelapse:1, color_back:'#009999', color_crest:'#FFFFAA', color_trough:'#000099', color_transparency:255, end_radius:2014, effect_wake:true, effect_water:false, effect_plasma:false, effect_movement:false, effect_pool_border:true, effect_attenuation:false };
+	//drawing state variables
+    var drawing={ 
+		x1:0, y1:0,
+		x2:0, y2:0,
+		xp:0, yp:0, 
+		mouseX:($scope.POOL_WIDTH/2), mouseY:($scope.POOL_HEIGHT/2), 
+		firstLine:false, 
+		poolBorder:false, 
+		color:'#ff0000', 
+		action:'', 
+		selectedFigure:null 
+	};
+
+	//stored application parameters
+    $scope.params = {
+		resolution:6000, 
+		wlength:50, 
+		origins:1, 
+		timelapse:1, 
+		color_back:'#009999', 
+		color_crest:'#FFFFAA', 
+		color_trough:'#000099', 
+		color_transparency:255, 
+		end_radius:2014, 
+		effect_wake:true, 
+		effect_water:false, 
+		effect_plasma:false, 
+		effect_movement:false, 
+		effect_pool_border:true, 
+		effect_attenuation:false, 
+		effect_spiral:false 
+	};
+    var op; //alias for $scope.params
+
     
     
     
 //---------------------------------------------------------------------------
-// USER ACTIONS -------------------------------------------------------------
+// App Params Functions                                                     -
 //---------------------------------------------------------------------------
     
+    // Notice that chrome.storage.sync.get is asynchronous
+    chrome.storage.sync.get('waveartist', function(value) {
+        //The $apply is only necessary to execute the function inside Angular scope
+        $scope.$apply(function() { $scope.load(value); });
+    });
+    
+//--
+    $scope.save = function() {
+        chrome.storage.sync.set({'waveartist': $scope.params});
+    };
+
+//--
+    // If there is saved data in storage, use it. Otherwise, bootstrap with DEFAULT
+    $scope.load = function(value) {
+		//set drawing canvas position
+        var rect=canvas.getBoundingClientRect();
+        canvasd.style.top=rect.top;
+        canvasd.style.left=rect.left;
+
+        //load params or set defaults
+        if (value && value.waveartist) {
+            $scope.params = value.waveartist;
+        } 
+        else {
+            $scope.params = { resolution:6000, wlength:50, origins:1, timelapse:1, color_back:'#009999', color_crest:'#FFFFAA', color_trough:'#000099', color_transparency:255, end_radius:2014, effect_wake:true, effect_water:false, effect_plasma:false, effect_movement:false, effect_pool_border:true, effect_attenuation:false, effect_spiral:false  };
+        }
+        
+        $scope.setParams();
+        
+    }
+    
+//--
     $scope.setParams=function() {
         var i, rgb;
         
@@ -83,80 +172,62 @@ function WAController($scope) {
         //change origins
         $scope.num_origins=1;
         
-        if(C===undefined || C.length!=op.origins) {
-            C=[];
+        if(origins===undefined || origins.length!=op.origins) {
+            origins=[];
             for(i=0; i<op.origins; i++) {
-                C.push(Object.create(clsC));
+                origins.push(Object.create(poolCenterPoint));
             }
-            refreshDrawing();
+            RefreshDrawing();
         }
-        
-        Dibujo.color = "#fff";
+
+		//set drawing params
+        drawing.color = "#fff";
         cdrawing.shadowColor="#000";
         cdrawing.shadowBlur=5;
         cdrawing.lineWidth=3;
-        //draw pool limits
+
+        //draw pool limits if not yet drew
         if(figures.length==0 || figures[figures.length-1].length==0) {
-            Linea(0, 0, XMA, 0, Dibujo.color);
-            Linea(XMA, 0, XMA, YMA, Dibujo.color);
-            Linea(XMA, YMA, 0, YMA, Dibujo.color);
-            Linea(0, YMA, 0, 0, Dibujo.color);
+            NewLine(0, 0, XMA, 0, drawing.color);
+            NewLine(XMA, 0, XMA, YMA, drawing.color);
+            NewLine(XMA, YMA, 0, YMA, drawing.color);
+            NewLine(0, YMA, 0, 0, drawing.color);
         }
         
-        //wlength onchange
-        virtualpalette=[];
-        for(i=0; i<op.wlength; i++) {
-            virtualpalette.push(Object.create(colorRGBa));
-        }
-        CreatePalette();
+        //wlength onchange resets palette
+        if(this.old_wlength!=op.wlength) {
+			virtualpalette=[];
+			for(i=0; i<op.wlength; i++) {
+				virtualpalette.push(Object.create(colorRGBa));
+			}
+			CreatePalette();
+		}
 
-         //video buffer/s
+        //video buffer/s
         cpoolData= cpool.getImageData(0,0, $scope.POOL_WIDTH, $scope.POOL_HEIGHT);
        
         //wake onchange
         if(this.old_effect_wake!=op.effect_wake) {
             FillPoolWater();
         }
+        
+        //refresh old values
         this.old_effect_wake=op.effect_wake;
+        this.old_wlength=op.wlength;
     }
 
-//--
-    // Notice that chrome.storage.sync.get is asynchronous
-    chrome.storage.sync.get('waveartist', function(value) {
-        // The $apply is only necessary to execute the function inside Angular scope
-        $scope.$apply(function() { $scope.load(value); });
-    });
-    
-//--
-    // If there is saved data in storage, use it. Otherwise, bootstrap with DEFAULT
-    $scope.load = function(value) {
-        var rect=canvas.getBoundingClientRect();
-        canvasd.style.top=rect.top;
-        canvasd.style.left=rect.left;
 
-        if (value && value.waveartist) {
-            $scope.params = value.waveartist;
-        } else {
-            $scope.params = { resolution:6000, wlength:50, origins:1, timelapse:1, color_back:'#009999', color_crest:'#FFFFAA', color_trough:'#000099', color_transparency:255, end_radius:2014, effect_wake:true, effect_water:false, effect_plasma:false, effect_movement:false, effect_pool_border:true, effect_attenuation:false  };
-        }
-        
-        $scope.setParams(!$scope.params.effect_wake);
-        
-    }
+//---------------------------------------------------------------------------
+// USER ACTIONS                                                             -
+//---------------------------------------------------------------------------
     
-//--
-    $scope.save = function() {
-        chrome.storage.sync.set({'waveartist': $scope.params});
-    };
-
-//--
     $scope.clickMenu=function(strMenu) {
         if($scope.currentMenu!=strMenu) {
             this.counter=0;
             $scope.currentMenu=strMenu;
             $scope.currentSubMenu='';
             $scope.showSubMenu=false;
-            refreshDrawing();
+            RefreshDrawing();
         }
         this.counter++;
         
@@ -169,39 +240,40 @@ function WAController($scope) {
                     cpool.clearRect(0,0,$scope.POOL_WIDTH,$scope.POOL_HEIGHT);
                 }
                 $scope.currentMenu='';
-                Dibujo.action='';
+                drawing.action='';
                 $scope.showSubMenu=false;
                 break;
             
             case 'stop':
-                if(idAniSimula!=null) {
-                    cancelAnimationFrame(idAniSimula);
-                    idAniSimula=null;
+                if(afSimulation!=null) {
+                    cancelAnimationFrame(afSimulation);
+                    afSimulation=null;
                 }
-                else if(idAniMove!=null) {
-                    cancelAnimationFrame(idAniMove);
-                    idAniMove=null;
+                else if(afMovement!=null) {
+                    cancelAnimationFrame(afMovement);
+					clearTimeout(idTimer);
+                    afMovement=null;
                 }
                 $scope.currentAction='';
                 $scope.paused=false;
-                Dibujo.action='';
+                drawing.action='';
                 $scope.showSubMenu=true;
                 break;
             
             case 'play':
-                if(idAniSimula==null && !$scope.paused) {
+                if(afSimulation==null && !$scope.paused) {
                     $scope.showSubMenu=true;
                     $scope.currentAction='play';
-                    Dibujo.action='';
-                    IniSimula();
-                    idAniSimula=requestAnimationFrame(Simula); //call Simula and loops inside with another requestAnimationFrame to Simula
+                    drawing.action='';
+                    InitSimulation();
+                    afSimulation=requestAnimationFrame(Simulation); //call Simulation and loops inside with another requestAnimationFrame to Simulation
                 }
                 break;
 
             case 'movement':
-                if(idAniMove==null && !$scope.paused) {
+                if(afMovement==null && !$scope.paused) {
                     $scope.currentAction='movement';
-                    startWaveMovement();
+                    StartWaveMovement();
                 }
                 break;
             
@@ -210,35 +282,34 @@ function WAController($scope) {
                 break;
             
             case 'lines':
-                Dibujo.action='drawLine';
-                Dibujo.firstLine=true;
+                drawing.action='drawLine';
+                drawing.firstLine=true;
                 if(figures[figures.length-1]!='') figures.push([]);
-                refreshDrawing();
+                RefreshDrawing();
                 break;
             
             case 'select':
-                Dibujo.action='drawSelect';
+                drawing.action='drawSelect';
                 if(this.counter>1) {
-                    drawSelectNext(1);
+                    DrawSelectNext(1);
                 }
-                $scope.showSubMenu=(Dibujo.selectedFigure!=null);
-                refreshDrawing();
+                $scope.showSubMenu=(drawing.selectedFigure!=null);
+                RefreshDrawing();
                 break;
             
             case 'origin':
                 if($scope.showSubMenu) {
                     $scope.num_origin++;
                     if($scope.num_origin>$scope.params.origins) $scope.num_origin=1;
-                    refreshDrawing();
+                    RefreshDrawing();
                 }
                 else {
                     $scope.showSubMenu=true;
                 }
-                Dibujo.action='setOrigin';
+                drawing.action='setOrigin';
                 break;
         }
     }
-
 
 //--
     $scope.clickSubMenu=function(strSubMenu) {
@@ -247,11 +318,11 @@ function WAController($scope) {
             //play            
             case 'pause':
                 if($scope.paused) {
-                    idAniSimula=requestAnimationFrame(Simula);
+                    afSimulation=requestAnimationFrame(Simulation);
                     $scope.currentSubMenu='';
                 }
                 else {
-                    cancelAnimationFrame(idAniSimula);
+                    cancelAnimationFrame(afSimulation);
                 }
                 $scope.paused=!$scope.paused;
                 break;
@@ -259,53 +330,54 @@ function WAController($scope) {
             //Wake It (movement)
             case 'pauseMove':
                 if($scope.paused) {
-                    idAniMove=requestAnimationFrame(waveMovement);
+                    afMovement=requestAnimationFrame(WaveMovement);
                     $scope.currentSubMenu='';
                 }
                 else {
-                    cancelAnimationFrame(idAniMove);
+                    cancelAnimationFrame(afMovement);
+					clearTimeout(idTimer);
                 }
                 $scope.paused=!$scope.paused;
                 break;
             
             //lines
             case 'closed':
-                if(Dibujo.firstLine==false) {
-                    Linea(Dibujo.x2,Dibujo.y2,Dibujo.xp,Dibujo.yp,Dibujo.color);
-                    refreshDrawing();
+                if(drawing.firstLine==false) {
+                    NewLine(drawing.x2,drawing.y2,drawing.xp,drawing.yp,drawing.color);
+                    RefreshDrawing();
                 }
                 //don't break;
             case 'opened':
                 $scope.currentMenu='';
                 $scope.currentSubMenu='';
                 $scope.showMenuLines=false;
-                Dibujo.action='';
-                refreshDrawing();
+                drawing.action='';
+                RefreshDrawing();
                 break;
             
             //select
             case 'move':
-                Dibujo.action='drawSelectMove';
+                drawing.action='drawSelectMove';
                 break;
             
             case 'duplicate':
-                if(Dibujo.selectedFigure!=null) {
-                    duplicateFigure(Dibujo.selectedFigure);
-                    Dibujo.action='drawSelect';
+                if(drawing.selectedFigure!=null) {
+                    DuplicateFigure(drawing.selectedFigure);
+                    drawing.action='drawSelect';
                 }
                 break;
 
             case 'delete':
-                if(Dibujo.selectedFigure!=null) {
-                    deleteFigure(Dibujo.selectedFigure);
-                    Dibujo.action='drawSelect';
+                if(drawing.selectedFigure!=null) {
+                    DeleteFigure(drawing.selectedFigure);
+                    drawing.action='drawSelect';
                 }
                 break;
 
             case 'divide':
-                if(Dibujo.selectedFigure!=null) {
-                    divideFigure(Dibujo.selectedFigure);
-                    Dibujo.action='drawSelect';
+                if(drawing.selectedFigure!=null) {
+                    DivideFigure(drawing.selectedFigure);
+                    drawing.action='drawSelect';
                 }
                 break;
 
@@ -313,16 +385,16 @@ function WAController($scope) {
             case 'square':
             case 'hexagon':
             case 'circle':
-                createFigure(figureDefinitions[strSubMenu]);
-                Dibujo.action='';
+                CreateFigure(FIGURE_SETS[strSubMenu]);
+                drawing.action='';
                 break;
         }
     }
 
 //--
     $scope.toggleDialog=function(name) { 
-        //show div ng-class=parameters
-        if(idAniSimula==null && idAniMove==null) {
+        //show div ng-class='name'
+        if(afSimulation==null && afMovement==null) {
             $scope.showDialog=( $scope.showDialog=='' ? name : '');
         }
     }   
@@ -330,61 +402,59 @@ function WAController($scope) {
 //--
     $scope.drawingClick = function(event) {
         
-        Dibujo.mouseX=event.offsetX;
-        Dibujo.mouseY=event.offsetY;
+        drawing.mouseX=event.offsetX;
+        drawing.mouseY=event.offsetY;
         
-        switch(Dibujo.action) {
+        switch(drawing.action) {
             case 'drawLine':
-                if(Dibujo.firstLine) {
-                    Dibujo.x1=Dibujo.mouseX;
-                    Dibujo.y1=Dibujo.mouseY;
-                    //cpool.fillRect(Dibujo.x1, Dibujo.y1, 1, 1);
-                    Dibujo.xp=Dibujo.x1;
-                    Dibujo.yp=Dibujo.y1;
-                    Dibujo.firstLine=false;
+                if(drawing.firstLine) {
+                    drawing.x1=drawing.mouseX;
+                    drawing.y1=drawing.mouseY;
+                    drawing.xp=drawing.x1;
+                    drawing.yp=drawing.y1;
+                    drawing.firstLine=false;
                 }
                 else {
-                    Dibujo.x2=Dibujo.mouseX;
-                    Dibujo.y2=Dibujo.mouseY;
-                    //cpool.fillRect(Dibujo.x2, Dibujo.y2, 1, 1);
-                    Linea(Dibujo.x1,Dibujo.y1,Dibujo.x2,Dibujo.y2,Dibujo.color);
-                    Dibujo.x1=Dibujo.x2;
-                    Dibujo.y1=Dibujo.y2;
-                    //after 2 lines you can close a figure
+                    drawing.x2=drawing.mouseX;
+                    drawing.y2=drawing.mouseY;
+                    NewLine(drawing.x1,drawing.y1,drawing.x2,drawing.y2,drawing.color);
+                    drawing.x1=drawing.x2;
+                    drawing.y1=drawing.y2;
+                    //after 2 lines allow user to close the figure
                     $scope.showSubMenu = figures[figures.length-1].length>1;
                 }
                 break;
             
             case 'drawSelect':
-                Dibujo.selectedFigure = pointIsOnFigureLine();
+                drawing.selectedFigure = PointIsOnFigureLine();
                 //select if point is on figure
-                if(Dibujo.selectedFigure!=null) {
+                if(drawing.selectedFigure!=null) {
                     //remark selected figure & show move control
-                    refreshDrawing();
+                    RefreshDrawing();
                     //show options
                     $scope.showSubMenu=true;
                 }
                 else {
-                    refreshDrawing();
+                    RefreshDrawing();
                     $scope.showSubMenu=false;
                 }
                 break;
             
             case 'drawSelectMove':
-                Dibujo.action='drawSelect';
+                drawing.action='drawSelect';
                 break;
             
             case 'drawSelectResize':
-                Dibujo.action='drawSelect';
+                drawing.action='drawSelect';
                 break;
             
             case 'setOrigin':
                 var i=$scope.num_origin-1;
-                //Puntos de origen
-                C[i].x=Dibujo.mouseX;
-                C[i].y=YMA-Dibujo.mouseY;
-                //Refrescar
-                refreshDrawing();
+
+                origins[i].x=drawing.mouseX;
+                origins[i].y=YMA-drawing.mouseY;
+
+                RefreshDrawing();
                 break;
         }
     }
@@ -392,131 +462,108 @@ function WAController($scope) {
 //--
     $scope.drawingMove = function(event) {
         $scope.drawInfo="x: "+event.offsetX+"  y: "+event.offsetY;
-        switch(Dibujo.action) {
+        switch(drawing.action) {
             case 'drawSelectMove':
-                moveFigure(Dibujo.selectedFigure, event.offsetX, event.offsetY);
+                MoveFigure(drawing.selectedFigure, event.offsetX, event.offsetY);
                 break;
             case 'drawLine':
-                if(!Dibujo.firstLine) {
-                    refreshDrawing();
-                    drawLine(Dibujo.x1,Dibujo.y1,event.offsetX, event.offsetY);
+                if(!drawing.firstLine) {
+                    RefreshDrawing();
+                    DrawLine(drawing.x1,drawing.y1,event.offsetX, event.offsetY);
                 }
                 break;
         }
     }
 
 //---------------------------------------------------------------------------
-// SIMULACION                                                               -
+// SIMULATION                                                               -
 //---------------------------------------------------------------------------
-    function IniSimula() {
+    function InitSimulation() {
         
         var i, j;
 
-        OND=[[]];
-        OV=[[]];
+        waves=[[]];
+        wavesPosBuffer=[[]];
 
-
+		//init waves
         for (i=0;i<op.origins;i++) {
-            OND.push([]);
+            waves.push([]);
             for (j=0;j<op.resolution;j++) {
-                OND[i].push(Object.create(particle));
+                waves[i].push(Object.create(particle));
             }
         }
-
-        for (i=0;i<=op.origins;i++) { //
-            OV.push([]);
-            for (j=0;j<op.resolution;j++) {
-                OV[i].push(Object.create(punto));
-            }
-            OV[i].push(Object.create(punto));
-        }
-        //initialization
         for (i=0;i<=op.origins;i++) {
-            OV[i][0].x=0;//Bmax
-            OV[i][0].y=i;//Wave Num (=op.origins=nextOV)
+            wavesPosBuffer.push([]);
+            for (j=0;j<op.resolution;j++) {
+                wavesPosBuffer[i].push(Object.create(point));
+            }
+            wavesPosBuffer[i].push(Object.create(point));
+        }
+        for (i=0;i<=op.origins;i++) {
+            wavesPosBuffer[i][0].x=0;//Bmax
+            wavesPosBuffer[i][0].y=i;//Wave Num (=op.origins=nextOV)
         }
     
-        DrawPiscina();
+        DrawPool();
         
-        //canvas.style.backgroundColor=op.color_back;
-    
-        // Inicializar valores onda
+        //init waves values
         for (i=0;i<op.origins;i++) {
-            Ini_onda(i);
+            InitWave(i);
         }
         
-        //video buffer/s
-        //cpoolData= cpool.getImageData(0,0, $scope.POOL_WIDTH, $scope.POOL_HEIGHT);
-        //fill pool
-        /*if(op.effect_wake) {
-            FillPoolWater();
-        }
-        else {
-            cpool.fillStyle = op.color_back;
-            cpool.fillRect(0,0,$scope.POOL_WIDTH,$scope.POOL_HEIGHT);
-        }*/
-        
-        //sets initial values
-        Simula.colorIndex=0;
-        Simula.waveRadius=1;
-        Simula.maxWave=1;
-        Simula.attenuation=op.end_radius;
-        Calcular.force=false;
+        //init simulation local vars
+        Simulation.colorIndex=0;
+        Simulation.waveRadius=1;
+        Simulation.maxWave=1;
+        Simulation.attenuation=op.end_radius;
+        Simulation.spiralAngle=-180; //de -180 a 179
+        ExpandWaveOneStep.force=false;
     }
     
 //--
-    function Ini_onda(num) {
+    function InitWave(num) {
         var i, j, m; //float m;
 
         m=2*PI/op.resolution;
         for (j=0;j<op.resolution;j++) {
-            OND[num][j].B=j*m; //(float)
-            if(OND[num][j].B>PI) OND[num][j].B=OND[num][j].B-2*PI;
-            OND[num][j].x=C[num].x;
-            OND[num][j].y=C[num].y;
-            Colision(num, j);
+            waves[num][j].B=j*m; //(float)
+            if(waves[num][j].B>PI) waves[num][j].B=waves[num][j].B-2*PI;
+            waves[num][j].x=origins[num].x;
+            waves[num][j].y=origins[num].y;
+            Collision(num, j);
        }
-        /*
-        m=op.resolution/360;
-        for (j=0;j<op.resolution;j++) {
-            OND[num][j].B=j/m; //(float)
-            OND[num][j].x=C[num].x;
-            OND[num][j].y=C[num].y;
-            Colision(num, j);
-        }
-        */
     }
 
 //--
-    function Simula() {
+    function Simulation() {
         var i;
     
         //count radius
-        //Simula.waveRadius= ++Simula.waveRadius || 1;
-        Simula.waveRadius++;
+        //Simulation.waveRadius= ++Simulation.waveRadius || 1;
+        Simulation.waveRadius++;
         
         //wave reset when end_radius is reached
-        if(Simula.waveRadius>op.end_radius) {
-            if (op.origins>1 && Simula.maxWave!=op.origins) Simula.waveRadius-=op.timelapse;
-            else Simula.waveRadius=0;
-            //Simula.maxWave= ++Simula.maxWave || 1;
-            Simula.maxWave++;
-            if(Simula.maxWave>op.origins) Simula.maxWave=1;
-            if(!op.effect_attenuation) Ini_onda(Simula.maxWave-1);
+        if(Simulation.waveRadius>op.end_radius) {
+            if (op.origins>1 && Simulation.maxWave!=op.origins) Simulation.waveRadius-=op.timelapse;
+            else Simulation.waveRadius=0;
+            //Simulation.maxWave= ++Simulation.maxWave || 1;
+            Simulation.maxWave++;
+            if(Simulation.maxWave>op.origins) Simulation.maxWave=1;
+            if(!op.effect_attenuation) InitWave(Simulation.maxWave-1);
         }
 
         //clear only for no wake effect
         if(!op.effect_wake) {
             cpool.clearRect(0,0,$scope.POOL_WIDTH,$scope.POOL_HEIGHT);
             cpoolData= cpool.getImageData(0,0, $scope.POOL_WIDTH, $scope.POOL_HEIGHT);
-            Simula.colorIndex=op.wlength-(op.wlength/4)|0;//index for color_crest
+            Simulation.colorIndex=op.wlength-(op.wlength/4)|0;//index for color_crest
         }
 
         //draw waves    
         for(i=0; i<op.origins; i++) {
             //start drawing after timelapse between waves
-            if(Simula.waveRadius>(op.timelapse*i)) {
-                Calcular(i);
+            if(Simulation.waveRadius>(op.timelapse*i)) {
+                ExpandWaveOneStep(i);
                 if(!op.effect_wake) {
                     DrawSingleWave(i);
                 }
@@ -525,60 +572,62 @@ function WAController($scope) {
                 }
             }
         }
-        Calcular.force=false;
+        ExpandWaveOneStep.force=false;
         
         //put buffer on canvas
         cpool.putImageData(cpoolData, 0, 0);
 
         
-        //change virtualpalette color index
-        Simula.colorIndex++;
-        if (Simula.colorIndex==op.wlength) Simula.colorIndex=0;
+        //change color
+        Simulation.colorIndex++;
+        if (Simulation.colorIndex==op.wlength) Simulation.colorIndex=0;
 
+		//attenuation
         if(op.effect_attenuation) {
-            Simula.attenuation--;
+            Simulation.attenuation--;
             PaletteAttenuation();
-            if(Simula.attenuation<10) {
+            if(Simulation.attenuation<10) {
                 $scope.currentMenu='stop';
                 $scope.currentAction='';
             }
         }
         
+        //stops or request next simulation frame
         if($scope.currentMenu=='stop') {
-            //cancelAnimationFrame(idAniSimula);
-            idAniSimula=null;
+            //cancelAnimationFrame(afSimulation);
+            afSimulation=null;
         }
         else {
-            idAniSimula=requestAnimationFrame(Simula);
+            afSimulation=requestAnimationFrame(Simulation);
         }
     }
 
 //--
-    function Calcular(num_onda) {
-        var aux_x, aux_y;//float
-        var O=OND[num_onda];
-        var previousLine;
+    function ExpandWaveOneStep(iWave) {
+        var O=waves[iWave];
 
-        for(j=0;j<op.resolution;j++) {
-            if(Calcular.force) {
-                Colision(num_onda, j);
+        for(var j=0;j<op.resolution;j++) {
+            if(ExpandWaveOneStep.force) {
+				//search new collision
+                Collision(iWave, j);
             }
             else {
+				//reduces particle distance to collision
                 if(O[j].M>1) O[j].M --;
                 
+                //particle has collisioned or not
                 if (O[j].M<=1) {
-//if(num_particle==1018) console.log('------------------');
-//if(num_particle==1018) console.log(O[j]);
-                    O[j].B = O[j].next_B;
-    
+					//sets particle new trayectory angle
+                    O[j].B = O[j].next_B; 
+					//moves particle in the new direction
                     O[j].x = O[j].Mx+Math.cos(O[j].B)/100;
                     O[j].y = O[j].My+Math.sin(O[j].B)/100;
-
-                    Colision(num_onda, j);
-//if(num_particle==1018) console.log(O[j]);
+					//search new collision
+                    Collision(iWave, j);
 
                 }    
                 else {
+					//moves particle
                     O[j].x += Math.cos(O[j].B);
                     O[j].y += Math.sin(O[j].B);
                 }
@@ -588,11 +637,11 @@ function WAController($scope) {
     }
 
 //--
-    function Colision(num_onda, num_particle) {
+    function Collision(iWave, iParticle) {
         var isOK, is2LineCollision, isPerfectAngleCollision;
         var pendiente,ra,rb,Ta,Tb,Tga,Tgb,m; //float 
         var Qax,Qay,Qbx,Qby,Pax,Pay,Pbx,Pby,Cx; //float 
-        var Cp=OND[num_onda][num_particle];
+        var Cp=waves[iWave][iParticle];
         var previousLine = figures[ Cp.iFigure ][ Cp.iLine ];
     
         Cp.M=XYMA;
@@ -643,10 +692,10 @@ function WAController($scope) {
                     }
                     //...and inside limits of the figure line
                     isOK=isOK && Cx>=-0.5 && Cx<=fline.len+0.5;
-//if(num_particle==1018) { console.log(i+' : '+j); console.log(isOK+' Cx:'+Cx+' Qax:'+Qax+' Qbx:'+Qax+' Qay:'+Qax+' Qby:'+Qax+' len:'+fline.len); }
+
                     if(isOK) {
                         m=Math.sqrt((Qay*Qay)+((Qax-Cx)*(Qax-Cx)))-1;
-//if(num_particle==1020) { console.log(m); }                        
+
                         if(m<Cp.M) {
                             if((Cp.M-m)<=1) { //less of 1 point in the same direction with another line
                                 is2LineCollision=true;
@@ -677,7 +726,7 @@ function WAController($scope) {
                 if(Cp.next_B>=PI) Cp.next_B=2*PI-Cp.next_B;
             }
             else {
-                Cp.next_B = Calc2LineReflection(num_onda, num_particle, previousLine);
+                Cp.next_B = Calc2LineReflection(iWave, iParticle, previousLine);
             }
         }
         else {
@@ -688,21 +737,21 @@ function WAController($scope) {
     }
 
 //--
-    function Calc2LineReflection(num_onda, num_particle, fline_prev) {
+    function Calc2LineReflection(iWave, iParticle, previousLine) {
         var isOK;
         var ra,rb,Tb,Tgb; //float 
         var Qax,Qay,Qbx,Qby; //float 
-        var Cp=OND[num_onda][num_particle];
+        var Cp=waves[iWave][iParticle];
 
         var fline=figures[Cp.iFigure][Cp.iLine];
 
         
         Pax=fline.x0;
         Pay=fline.y0;
-        Qax=fline_prev.x0-Pax;
-        Qay=fline_prev.y0-Pay;
-        Qbx=fline_prev.x1-Pax;
-        Qby=fline_prev.y1-Pay;
+        Qax=previousLine.x0-Pax;
+        Qay=previousLine.y0-Pay;
+        Qbx=previousLine.x1-Pax;
+        Qby=previousLine.y1-Pay;
      
         rb=Math.sqrt((Qbx*Qbx)+(Qby*Qby));
      
@@ -712,13 +761,13 @@ function WAController($scope) {
 
         Qby=rb*Math.sin(Tgb);
         
-        closedAngle=Math.asin(Qby/fline_prev.len);
+        closedAngle=Math.asin(Qby/previousLine.len);
         if(Qbx>Qax) closedAngle=PI/2+PI/2-closedAngle;
-        if(fline.rad > (PI+fline_prev.rad)) { //2nd line turn right from 1st
-            closedAngle= fline_prev.rad-(closedAngle/2);
+        if(fline.rad > (PI+previousLine.rad)) { //2nd line turn right from 1st
+            closedAngle= previousLine.rad-(closedAngle/2);
         }
         else { //turn left
-            closedAngle= fline_prev.rad+(closedAngle/2);
+            closedAngle= previousLine.rad+(closedAngle/2);
         }
         if(closedAngle<-PI) closedAngle+=2*PI;
         if(closedAngle>=PI) closedAngle-=2*PI;
@@ -734,20 +783,20 @@ function WAController($scope) {
         var cfindex;
         var coloraux={R:0,G:0,B:0,a:0}; 
         
-        var alphaColor=(op.effect_attenuation ? Simula.attenuation*255/op.end_radius : op.color_transparency);
+        var alphaColor=(op.effect_attenuation ? Simulation.attenuation*255/op.end_radius : op.color_transparency);
         
-        if(op.effect_plasma || op.effect_water) {
-            //takes vectors for nextValues and the previous values of the wave
+        if(op.effect_plasma || op.effect_water || op.effect_spiral) {
+            //takes arrays for nextValues and the previous values of the wave
             var prevOV,nextOV;
             for(j=0; j<=op.origins;j++) {
-                if(OV[j][0].y==num) prevOV=OV[j];
-                if(OV[j][0].y==op.origins) nextOV=OV[j];
+                if(wavesPosBuffer[j][0].y==num) prevOV=wavesPosBuffer[j];
+                if(wavesPosBuffer[j][0].y==op.origins) nextOV=wavesPosBuffer[j];
             }
             //takes wave points not painted on the same coordinates
             Bmax=0;
             for(A=0;A<op.resolution;A++) {
-                x=(OND[num][A].x | 0);//int
-                y=YMA-(OND[num][A].y | 0);
+                x=(waves[num][A].x | 0);//int
+                y=YMA-(waves[num][A].y | 0);
                 dibujar=true;
                 for(B=Bmax;B>0;B--) {
                     if(x==nextOV[B].x && y==nextOV[B].y) {
@@ -765,9 +814,9 @@ function WAController($scope) {
             
             //paint effect
             if(op.effect_plasma) {
-                ro=virtualpalette[Simula.colorIndex].R;
-                go=virtualpalette[Simula.colorIndex].G;
-                bo=virtualpalette[Simula.colorIndex].B;
+                ro=virtualpalette[Simulation.colorIndex].R;
+                go=virtualpalette[Simulation.colorIndex].G;
+                bo=virtualpalette[Simulation.colorIndex].B;
                 //paint the not repeated wave points coordinates
                 for(B=1;B<=Bmax;B++) {
                     x=nextOV[B].x;
@@ -781,12 +830,12 @@ function WAController($scope) {
                         }
                     }
                     if(dibujar) {
-                        getPixel(x,y,coloraux);
+                        GetPixel(x,y,coloraux);
                         coloraux.R=((coloraux.R + ro) & 255);
                         coloraux.G=((coloraux.G + go) & 255);
                         coloraux.B=((coloraux.B + bo) & 255);
                         coloraux.a=alphaColor;
-                        setPixel(x, y, coloraux);
+                        SetPixel(x, y, coloraux);
                     }
                 }
             }
@@ -804,7 +853,7 @@ function WAController($scope) {
                         }
                     }
                     if(dibujar) {
-                        getPixel(x,y,coloraux);
+                        GetPixel(x,y,coloraux);
                         //icoloralpha-frame to icolor-frame 
                         cfindex=coloraux.a-256+op.wlength;
                         if(cfindex!=NaN) {
@@ -812,18 +861,42 @@ function WAController($scope) {
                             
                             //mix wave color with pool color, and return the icolor-frame
                             //try {
-                            cfindex = Simula.colorIndex + (Simula.colorIndex<(op.wlength/4) || Simula.colorIndex>=(op.wlength*3/4) ? 1 : -1) * virtualpalette[cfindex].level;
+                            cfindex = Simulation.colorIndex + (Simulation.colorIndex<(op.wlength/4) || Simulation.colorIndex>=(op.wlength*3/4) ? 1 : -1) * virtualpalette[cfindex].level;
                             /*} catch(e) {
                                 console.log(x+' ' +y+' '+cfindex);
                             }*/
                             if(cfindex>=op.wlength) cfindex-=op.wlength;
                             if(cfindex<0) cfindex+=op.wlength;
             
-                            setPixel(x,y, virtualpalette[cfindex|0]);
+                            SetPixel(x,y, virtualpalette[cfindex|0]);
                         }
                     }
                 }
             }
+			else if(op.effect_spiral) {
+				Simulation.spiralAngle+=2;
+				if(Simulation.spiralAngle>179) Simulation.spiralAngle=-180;
+                //paint the not repeated wave points coordinates
+                for(B=1;B<=Bmax;B++) {
+                    x=nextOV[B].x;
+                    y=nextOV[B].y;
+                    dibujar=true;
+                    //disables wave point paint if was painted on the previous wave move
+                    for(pB=1;pB<=prevOV[0].x;pB++) {
+                        if(prevOV[pB].x==x && prevOV[pB].y==y) {
+                            dibujar=false;
+                            break;
+                        }
+                    }
+                    if(dibujar) {
+						cfindex = Simulation.colorIndex + (Simulation.spiralAngle-(B*360/Bmax)/op.wlength);
+			    		if(cfindex>=op.wlength) cfindex-=op.wlength;
+
+                        //coloraux.a=alphaColor;
+                        SetPixel(x, y, virtualpalette[cfindex|0]);
+                    }
+                }
+			}
             //rotate prevOV and nextOV
             nextOV[0].y=prevOV[0].y;
             prevOV[0].y=op.origins;
@@ -838,48 +911,48 @@ function WAController($scope) {
         var j, x, y;
 
         for(j=0; j<op.resolution; j++) {
-            x=(OND[num][j].x | 0); //int
-            y=YMA-(OND[num][j].y | 0);
+            x=(waves[num][j].x | 0); //int
+            y=YMA-(waves[num][j].y | 0);
             
-            setPixel(x, y, virtualpalette[Simula.colorIndex]);
+            SetPixel(x, y, virtualpalette[Simulation.colorIndex]);
         }
     }
 
 //--
-    function startWaveMovement() {
+    function StartWaveMovement() {
         var i;
         //create image buffers' array
-        startWaveMovement.framesData=[];
+        StartWaveMovement.framesData=[];
         for(i=0; i<op.wlength; i++) {
-            startWaveMovement.framesData.push( cpool.getImageData(0,0, $scope.POOL_WIDTH, $scope.POOL_HEIGHT) );
+            StartWaveMovement.framesData.push( cpool.getImageData(0,0, $scope.POOL_WIDTH, $scope.POOL_HEIGHT) );
         }
         
         //rotate colors in each buffer
         for(i=1; i<op.wlength; i++) {
-            rotateFramePalette(startWaveMovement.framesData[i], i);
+            RotateFramePalette(StartWaveMovement.framesData[i], i);
             //show progress?
         }
 
         //starts animation that rotates buffer showed in canvas
-        idAniMove=requestAnimationFrame(waveMovement);
+        afMovement=requestAnimationFrame(WaveMovement);
     }
     
 //--
-    function waveMovement() {
+    function WaveMovement() {
         try {
-            waveMovement.frame = --waveMovement.frame || 0;
-            if(waveMovement.frame<0) waveMovement.frame=op.wlength-1;
+            WaveMovement.frame = --WaveMovement.frame || 0;
+            if(WaveMovement.frame<0) WaveMovement.frame=op.wlength-1;
             
-            cpool.putImageData(startWaveMovement.framesData[waveMovement.frame], 0, 0);
-            idAniMove=requestAnimationFrame(waveMovement);
+            cpool.putImageData(StartWaveMovement.framesData[WaveMovement.frame], 0, 0);
+            idTimer=setTimeout(function() {afMovement=requestAnimationFrame(WaveMovement);}, 150);
         }
         catch(e) {
             console.log(e);
         }
     }
-    
+
 //--
-    function rotateFramePalette(frameData, frameIndex) {
+    function RotateFramePalette(frameData, frameIndex) {
         var c, paletteIndex;
         var base=256-op.wlength;
         var len=frameData.width*frameData.height*4;
@@ -903,14 +976,14 @@ function WAController($scope) {
 //---------------------------------------------------------------------------
 // FIGURES FUNCTIONS                                                        -
 //---------------------------------------------------------------------------
-    function refreshDrawing() {
+    function RefreshDrawing() {
         cdrawing.clearRect(0,0,$scope.POOL_WIDTH,$scope.POOL_HEIGHT);
-        DrawPiscina();
-        if($scope.currentMenu=='origin') VerPuntosOrigen();
+        DrawPool();
+        if($scope.currentMenu=='origin') ShowOrigins();
     }
 
 //--
-    function drawLine(x0,y0,x1,y1) {
+    function DrawLine(x0,y0,x1,y1) {
         cdrawing.beginPath();
         cdrawing.moveTo(x0, y0);
         cdrawing.lineTo(x1, y1);
@@ -918,26 +991,26 @@ function WAController($scope) {
     }
 
 //--
-    function DrawPiscina() {
-        cdrawing.strokeStyle = Dibujo.color;
+    function DrawPool() {
+        cdrawing.strokeStyle = drawing.color;
         for (i in figures) {
             for(j in figures[i]) {
-                drawLine(figures[i][j].x0, YMA-figures[i][j].y0, figures[i][j].x1, YMA-figures[i][j].y1);
+                DrawLine(figures[i][j].x0, YMA-figures[i][j].y0, figures[i][j].x1, YMA-figures[i][j].y1);
             }
         }
         if($scope.currentMenu=='select') {
-            i=Dibujo.selectedFigure;
+            i=drawing.selectedFigure;
             cdrawing.strokeStyle="#fcf";
             for(j in figures[i]) {
-                drawLine(figures[i][j].x0, YMA-figures[i][j].y0, figures[i][j].x1, YMA-figures[i][j].y1);
+                DrawLine(figures[i][j].x0, YMA-figures[i][j].y0, figures[i][j].x1, YMA-figures[i][j].y1);
             }
-            cdrawing.strokeStyle=Dibujo.color;
+            cdrawing.strokeStyle=drawing.color;
         }
 
     }
 
 //--
-    function Linea(x1, y1, x2, y2, color) {
+    function NewLine(x1, y1, x2, y2, color) {
         var ax,ay,bx,by;
         var r,dx,dy,delt;
     
@@ -955,8 +1028,8 @@ function WAController($scope) {
             if(y1<y2) delt=-Math.acos((x2-x1)/r);
             else delt=Math.acos((x2-x1)/r);
 
-            cdrawing.strokeStyle = Dibujo.color;
-            drawLine(x1,y1,x2,y2);
+            cdrawing.strokeStyle = drawing.color;
+            DrawLine(x1,y1,x2,y2);
 
             //crea linea
             numFigure=(figures.length-1);
@@ -971,35 +1044,35 @@ function WAController($scope) {
             newLine.oRad=delt;
             newLine.oLen=r;
     
-            Calcular.force=true;
+            ExpandWaveOneStep.force=true;
         }
     }
 
 //--
-    function drawSelectNext(number) {
+    function DrawSelectNext(number) {
         if(figures.length>1) {
-            if(Dibujo.selectedFigure==null) {
-                Dibujo.selectedFigure=figures.length-1;
+            if(drawing.selectedFigure==null) {
+                drawing.selectedFigure=figures.length-1;
             }
             else {
-                number+=Dibujo.selectedFigure;
+                number+=drawing.selectedFigure;
                 if(number>=figures.length) number=1;
                 else if(number<=1) number=figures.length-1;
-                Dibujo.selectedFigure=number;
+                drawing.selectedFigure=number;
             }
-            refreshFigureInfo(Dibujo.selectedFigure);
+            RefreshFigureInfo(drawing.selectedFigure);
         }
     }
     
 //--
-    function refreshFigureInfo(iFigure) {
+    function RefreshFigureInfo(iFigure) {
         var fline=figures[iFigure][0];
         $scope.figure_size=Math.round(fline.len/fline.oLen*100);
         $scope.figure_angle=Math.round((fline.oRad-fline.rad)*180/PI);
     }
     
 //--
-    function pointIsOnFigureLine() {
+    function PointIsOnFigureLine() {
         var ax,ay, bx,by, px,py,ph, palpha;
         for (var i=1; i<figures.length; i++) {
             for(var j in figures[i]) {
@@ -1010,15 +1083,15 @@ function WAController($scope) {
                 ay=YMA-fline.y0;
                 bx=Math.abs(fline.x1-ax);
                 by=Math.abs(YMA-fline.y1-ay);
-                px=Math.abs(Dibujo.mouseX-ax);
-                py=Math.abs(Dibujo.mouseY-ay);
+                px=Math.abs(drawing.mouseX-ax);
+                py=Math.abs(drawing.mouseY-ay);
                 //inside line size
                 if(px<=bx && py<=by) {
                     ph=Math.sqrt(px*px+py*py);                
-                    palpha=(ay<Dibujo.mouseY ? -1 : 1)*Math.acos((Dibujo.mouseX-ax)/ph);
+                    palpha=(ay<drawing.mouseY ? -1 : 1)*Math.acos((drawing.mouseX-ax)/ph);
                     //near angle
                     if(Math.abs((palpha+PI)-(fline.rad+PI))<0.5) {
-                        refreshFigureInfo(i)
+                        RefreshFigureInfo(i)
                         return i;
                     }
                 }
@@ -1028,7 +1101,7 @@ function WAController($scope) {
     }
 
 //--
-    function moveFigure(iFigure, newX, newY) {
+    function MoveFigure(iFigure, newX, newY) {
         newY=YMA-newY;
         
         var difX=newX-figures[iFigure][0].x0;
@@ -1044,16 +1117,16 @@ function WAController($scope) {
             figures[iFigure][j].x1+=difX;
             figures[iFigure][j].y1+=difY;
         }
-        refreshDrawing();
-        Calcular.force=true;
+        RefreshDrawing();
+        ExpandWaveOneStep.force=true;
     }
 
 //--
     $scope.figureSize=function() {
         var endX, endY;
-        var iFigure=Dibujo.selectedFigure;
+        var iFigure=drawing.selectedFigure;
         
-        //startX y startY = punto 0 figura
+        //startX y startY = point 0 figura
         var startX = figures[iFigure][0].x0;
         var startY = figures[iFigure][0].y0;
 
@@ -1070,16 +1143,16 @@ function WAController($scope) {
             startX=endX;
             startY=endY;
         }
-        refreshDrawing();
-        Calcular.force=true;
+        RefreshDrawing();
+        ExpandWaveOneStep.force=true;
     }
     
 //--
     $scope.figureAngle=function() {
         var endX, endY;
-        var iFigure=Dibujo.selectedFigure;
+        var iFigure=drawing.selectedFigure;
         
-        //startX y startY = punto 0 figura
+        //startX y startY = point 0 figura
         var startX = figures[iFigure][0].x0;
         var startY = figures[iFigure][0].y0;
 
@@ -1099,12 +1172,12 @@ function WAController($scope) {
             startX=endX;
             startY=endY;
         }
-        refreshDrawing();
-        Calcular.force=true;
+        RefreshDrawing();
+        ExpandWaveOneStep.force=true;
     }
 
 //--
-    function duplicateFigure(iFigure) {
+    function DuplicateFigure(iFigure) {
         //new figure
         if(figures[figures.length-1]!='') figures.push([]);
         iFigureNew=figures.length-1;
@@ -1113,25 +1186,25 @@ function WAController($scope) {
             figures[iFigureNew].push(Object.create(figures[iFigure][j]));
         }
         //select new figure
-        Dibujo.selectedFigure=iFigureNew;
+        drawing.selectedFigure=iFigureNew;
         //move from the original position to make it visible
-        moveFigure(iFigureNew, figures[iFigureNew][0].x0+20, figures[iFigureNew][0].y0+20);
+        MoveFigure(iFigureNew, figures[iFigureNew][0].x0+20, figures[iFigureNew][0].y0+20);
         
-        refreshDrawing();
+        RefreshDrawing();
     }
 
 //--
-    function divideFigure(iFigure) {
+    function DivideFigure(iFigure) {
         half=Math.round(figures[iFigure].length/2);
         if(half>1) {
             figures[iFigure].splice(half,half);
         }
-        refreshDrawing();
-        Calcular.force=true;
+        RefreshDrawing();
+        ExpandWaveOneStep.force=true;
    }
 
 //--
-    function createFigure(faces) {
+    function CreateFigure(faces) {
         var startX=Math.round($scope.POOL_WIDTH/2);
         var startY=Math.round($scope.POOL_HEIGHT/2);
         var rad=2*PI/faces, angle;
@@ -1161,32 +1234,32 @@ function WAController($scope) {
             angle-=rad;
         }
         //select new figure
-        Dibujo.selectedFigure=iFigureNew;
+        drawing.selectedFigure=iFigureNew;
         
-        refreshDrawing();
+        RefreshDrawing();
     }
 
 //--
-    function deleteFigure(iFigure) {
+    function DeleteFigure(iFigure) {
         figures.splice(iFigure,1);
-        Dibujo.selectedFigure=null;
-        drawSelectNext(1);
-        if(Dibujo.selectedFigure==null) $scope.showSubMenu=false;
-        refreshDrawing();
-        Calcular.force=true;
+        drawing.selectedFigure=null;
+        DrawSelectNext(1);
+        if(drawing.selectedFigure==null) $scope.showSubMenu=false;
+        RefreshDrawing();
+        ExpandWaveOneStep.force=true;
     }
 
 //--
-    function VerPuntosOrigen() {
+    function ShowOrigins() {
         var x,y, lon;
         var blur=cdrawing.shadowBlur;
         cdrawing.shadowBlur=1;;
         for(var i=0;i<op.origins;i++) {
-            x=C[i].x;
-            y=YMA-C[i].y;
+            x=origins[i].x;
+            y=YMA-origins[i].y;
             lon=4;
-            cdrawing.strokeStyle = Dibujo.color;
-            cdrawing.fillStyle = Dibujo.color;
+            cdrawing.strokeStyle = drawing.color;
+            cdrawing.fillStyle = drawing.color;
             cdrawing.font="18px Arial";
             //selected;
             if($scope.currentMenu=='origin' && i==($scope.num_origin-1)) {
@@ -1195,8 +1268,8 @@ function WAController($scope) {
                 cdrawing.fillStyle = "#fcf"; 
                 cdrawing.font="22px Arial";
             }
-            drawLine(x-lon,y,x+lon,y);
-            drawLine(x,y-lon,x,y+lon);
+            DrawLine(x-lon,y,x+lon,y);
+            DrawLine(x,y-lon,x,y+lon);
             cdrawing.textAlign=(x<($scope.POOL_WIDTH/2) ? "start" : "end"); 
             cdrawing.textBaseline=(y<($scope.POOL_HEIGHT/2) ? "top" :"bottom");
             cdrawing.fillText((i+1),x, y + (lon+2)*(y<($scope.POOL_HEIGHT/2) ? 1 : -1));
@@ -1207,7 +1280,7 @@ function WAController($scope) {
 //---------------------------------------------------------------------------
 // PAINT FUNCTIONS                                                          -
 //---------------------------------------------------------------------------
-    function setPixel(x, y, c) {
+    function SetPixel(x, y, c) {
         var index = (x + y * $scope.POOL_WIDTH) * 4;
         cpoolData.data[index] = c.R;
         cpoolData.data[index+1] = c.G;
@@ -1216,7 +1289,7 @@ function WAController($scope) {
     }
     
 //--
-    function getPixel(x, y, c) {
+    function GetPixel(x, y, c) {
         var index = (x + y * $scope.POOL_WIDTH) * 4;
         c.R=cpoolData.data[index];
         c.G=cpoolData.data[index+1];
@@ -1225,14 +1298,14 @@ function WAController($scope) {
     }
 
 //--
-    function getMousePos(canvas, evt) {
+/*    function GetMousePos(canvas, evt) {
         var rect = canvas.getBoundingClientRect();
         return {
             x: evt.clientX - rect.left,
             y: evt.clientY - rect.top
         };
     }
-
+*/
 //--
     function FillPoolWater() {
         cpool.clearRect(0,0,cpoolData.width,cpoolData.height);
@@ -1291,7 +1364,7 @@ function WAController($scope) {
 
 //--
     function PaletteAttenuation() {
-        var alpha=Simula.attenuation*255/op.end_radius;
+        var alpha=Simulation.attenuation*255/op.end_radius;
         for(i=op.wlength-1; i>=0; i--) {
             virtualpalette[i].a=alpha;
         }
@@ -1357,421 +1430,3 @@ function WAController($scope) {
     }
 }
 
-
-/*********************
-     function DrawWakeWave(num) {
-        var j, J, pJ, x, y, xa, ya, A,B,Bmax,pB,Btest;
-        var dibujar; //bool
-        var r,g,b, ro,go,bo; //unsigned char
-        var cfindex;
-        var coloraux={R:0,G:0,B:0,a:op.color_transparency}; //TColor
-    
-        if(op.effect_plasma || op.effect_water) {
-            var ratioPrevNext;
-            prevOV[num][0].x=nextOV[0].x || 0;//previous Bmax
-            //takes wave points not painted on the same coordinates
-            Bmax=0;
-            for(A=0;A<op.resolution;A++) {
-                x=(OND[num][A].x | 0);//int
-                y=(($scope.YMA-OND[num][A].y) | 0);
-                dibujar=true;
-                for(B=Bmax;B>0;B--) {
-                    if(x==nextOV[B].x && y==nextOV[B].y) {
-                        dibujar=false;
-                        B=-1;
-                    }
-                }
-                if(dibujar) {
-                    Bmax++;
-                    prevOV[num][Bmax].x=nextOV[Bmax].x || 0;
-                    prevOV[num][Bmax].y=nextOV[Bmax].y || 0;
-                    nextOV[Bmax].x=x;
-                    nextOV[Bmax].y=y;
-                }
-            }
-            nextOV[0].x=Bmax;
-            ratioPrevNext=prevOV[num][0].x/Bmax;
-            Btest=Btest=(prevOV[num][0].x<=64 ? prevOV[num][0].x : (64* (1-64 / (op.resolution-prevOV[num][0].x+1) ) )|0) || 0;//(Bmax/prevOV[num][0].x)|0;
-            //paint the not repeated wave points coordinates
-            for(B=1;B<=Bmax;B++) {
-                x=nextOV[B].x;
-                y=nextOV[B].y;
-                dibujar=true;
-                //disables wave point paint if was painted on the previous wave move
-                if(Btest==1) {
-                    pB=(B*ratioPrevNext)|0;
-                    dibujar=!(prevOV[num][pB].x==x && prevOV[num][pB].y==y);
-                }
-                else {
-                    pB=((B*ratioPrevNext)-(Btest/2))|0;
-                    if(pB<1) pB+=prevOV[num][0].x;
-                    for(j=0;j<Btest;j++) {
-                        if(prevOV[num][pB].x==x && prevOV[num][pB].y==y) {
-                            dibujar=false;
-                            break;
-                        }
-                        pB++;
-                        if(pB==0) pB=1;
-                    }
-                }
-                if(dibujar) {
-                    if(op.effect_plasma) {
-                        console.log("");
-                    }
-                    else if(op.effect_water) {
-                        getPixel(x,y,coloraux);
-                        //icoloralpha-frame to icolor-frame 
-                        cfindex=coloraux.a-256+op.wlength;
-                        
-                        //mix wave color with pool color, and return the icolor-frame
-                        cfindex = cindex + (cindex<(op.wlength/4) || cindex>=(op.wlength*3/4) ? 1 : -1) * virtualpalette[cfindex].level;
-        
-                        if(cfindex>=op.wlength) cfindex-=op.wlength;
-                        if(cfindex<0) cfindex+=op.wlength;
-        
-                        setPixel(x,y, virtualpalette[cfindex|0]);
-                    }
-                }
-            }
-        }
-        else {
-            DrawSingleWave();
-        }        
-    }
-*********************/
-
-    /*    
-        if(op.effect_plasma==1) {    
-            ro=virtualpalette[cindex].R;
-            go=virtualpalette[cindex].G;
-            bo=virtualpalette[cindex].B;
-            
-            J=0;
-            x=(OND[num][0].x | 0);//int
-            y=(($scope.YMA-OND[num][0].y) | 0);
-            nextOV[0].x=x;
-            nextOV[0].y=y;
-            
-            for(j=1; j<op.resolution; j++) {
-                x=(OND[num][j].x | 0);//int
-                y=(($scope.YMA-OND[num][j].y) | 0);
-                dibujar = !(x==nextOV[J].x && y==nextOV[J].y);
-                if(dibujar) {
-                    J++;
-                    nextOV[J].x=x;
-                    nextOV[J].y=y;
-                }
-            }
-            
-            while(J>=0) {
-                x=nextOV[J].x;
-                y=nextOV[J].y;
-
-                getPixel(x,y,coloraux);
-                coloraux.R=((coloraux.R + ro) & 255);
-                coloraux.G=((coloraux.G + go) & 255);
-                coloraux.B=((coloraux.B + bo) & 255);
-                coloraux.a=op.color_transparency;
-                setPixel(x, y, coloraux);
-                
-                J--;
-            }
-   
-            //prevOV.splice(num,1,Object.create(nextOV));
-            //prevOV[num][0].x=Bmax;
-        }
-        //water
-        else if(op.effect_water) {
-            x=(OND[num][0].x | 0);//int
-            y=(($scope.YMA-OND[num][0].y) | 0);
-            nextOV[0].x=x;
-            nextOV[0].y=y;
-            J=0;
-           
-            for(j=0; j<op.resolution; j++) {
-                x=(OND[num][j].x | 0);//int
-                y=(($scope.YMA-OND[num][j].y) | 0);
-                dibujar = (x!=nextOV[J].x || y!=nextOV[J].y);
-                if(dibujar) {
-                    J++;
-                    nextOV[J].x=x;
-                    nextOV[J].y=y;
-                }
-            }
-
-            while(J>=0) {
-                x=nextOV[J].x;
-                y=nextOV[J].y;
-
-                getPixel(x,y,coloraux);
-                //icoloralpha-frame to icolor-frame 
-                cfindex=coloraux.a-256+op.wlength;
-                
-                //mix wave color with pool color, and return the icolor-frame
-                cfindex = cindex + (cindex<(op.wlength/4) || cindex>=(op.wlength*3/4) ? 1 : -1) * virtualpalette[cfindex].level;
-
-                if(cfindex>=op.wlength) cfindex-=op.wlength;
-                if(cfindex<0) cfindex+=op.wlength;
-
-                setPixel(x,y, virtualpalette[cfindex|0]);
-
-                
-                J--;
-            }
-        
-        }
-        //no effects
-        else {
-            DrawSingleWave(num);
-        }
-    */
-//colision
-        /*var Ox,Oy, Lx,Ly, Th,Ta,Tb,Trad, Ua,Ph,Px,Py, Cx,Cy, inside;
-        var Cp=OND[num_onda][num_particle];
-    
-        Cp.M=0;
-        alpha=Cp.B;
-    
-        for (var i in figures) {
-            for(var j in figures[i]) {
-                fline=figures[i][j];
-                
-                //traslate
-                Ox=0-Cp.x;
-                Oy=0-Cp.y;
-                Lx=fline.x0+Ox;
-                Ly=fline.y0+Oy;
-                //rotate 
-                Th=Math.sqrt(Lx*Lx+Ly*Ly);
-                Trad=Math.acos(Lx/Th);
-                lOp=Trad-alpha;
-                Ta=Math.cos(lOp)*Th;
-                Tb=Math.sin(lOp)*Th;
-                if(Ly<0 && alpha<0) Tb=-Tb;
-                //solve P
-                lPo=Math.abs((fline.rad<0 ? fline.rad+PI : fline.rad) - (alpha<0 ? alpha+PI : alpha));
-                Ua=Tb/Math.tan(lPo);
-                Ph=Math.abs(Ta+Ua);
-                //de-rotate and de-traslate
-                Px=(Math.cos(alpha)*Ph-Ox)|0;
-                Py=(Math.sin(alpha)*Ph-Oy)|0;
-                //calculate Cp+XYMA
-                Cx=Cp.x+Math.cos(alpha)*XYMA;
-                Cy=Cp.y+Math.sin(alpha)*XYMA;
-                //P is inside figure line
-                inside=(Math.abs(Px-fline.x0)<=Math.abs(fline.x1-fline.x0) && Math.abs(Py-fline.y0)<=Math.abs(fline.y1-fline.y0));
-                inside=inside && (Math.abs(Px-fline.x0)<=Math.abs(Cx-Cp.x) && Math.abs(Py-fline.y0)<=Math.abs(Cy-Cp.y));
-//console.log(num_onda+":"+Cp.B+":"+j+" X:"+Math.abs(Px-fline.x0)+"<="+Math.abs(fline.x1-fline.x0)+" Y:"+Math.abs(Py-fline.y0)+"<="+Math.abs(fline.y1-fline.y0)+" Ph:"+Ph+" P:"+Px+", "+Py+" lOp:"+lOp+" lPo:"+lPo);
-//console.log(Cp.B+" a:"+alpha+" b:"+fline.rad+" Trad:"+Trad+" O:"+Ox+","+Oy+" L:"+Lx+","+Ly+" Th:"+Th+" Ta:"+Ta+" Tb:"+Tb+" Ua:"+Ua);                
-                if(inside && (Cp.M==0 || Cp.M>Ph)) {
-                    Cp.M=Ph;
-                    Cp.cd=fline.rad;//float
-                    //console.log("************");
-                }
-            } 
-        }
-        */
-
-
-/*    function Calcular(num_onda) {
-        var A;
-        var aux_x, aux_y;//float
-        var O=OND[num_onda];
-
-        for(j=0;j<op.resolution;j++) {
-            if(Calcular.force) {
-                //aux_x=Math.cos(O[j].B);
-                //aux_y=Math.sin(O[j].B);
-                //O[j].M = O[j].M - Math.sqrt((aux_x*aux_x)+(aux_y*aux_y));
-
-                //O[j].x = O[j].x + Math.cos( O[j].B );
-                //O[j].y = O[j].y + Math.sin( O[j].B );
-
-                Colision(num_onda, j);
-            }
-            else {
-                O[j].M --;
-                if (O[j].M<1) {
-                    O[j].B = 360 - O[j].B*180/PI + 2 * (O[j].cd*180/PI);//reflection angle (deg)
-                    if(O[j].B >= 360) O[j].B-=360;
-                    O[j].B=(O[j].B<180 ? O[j].B*PI/180 : ((O[j].B-360)*PI/180));//to rad
-    
-                    O[j].x = O[j].Mx;
-                    O[j].y = O[j].My;
-
-                    Colision(num_onda, j);
-                }    
-                else {
-                    O[j].x += Math.cos(O[j].B);
-                    O[j].y += Math.sin(O[j].B);
-                }
-            }
-        }
- 
-    }
-
-//--
-    function Colision(num_onda, num_particle) {
-        var cond_b;
-        var pendiente,ra,rb,Ta,Tb,Tga,Tgb,m; //float 
-        var Qax,Qay,Qbx,Qby,Pax,Pay,Pbx,Pby,Pm,Cx; //float 
-        var Cp=OND[num_onda][num_particle];
-    
-        Cp.M=0;
-    
-        for (var i in figures) {
-            for(var j in figures[i]) {
-                fline=figures[i][j];
-                
-                Pax=(fline.x0);
-                Pay=(fline.y0);
-                Pbx=(fline.x1)-Pax;
-                Pby=(fline.y1)-Pay;
-                Qax=Cp.x-Pax;
-                Qay=Cp.y-Pay;
-                Qbx=Cp.x+Math.cos(Cp.B)*XYMA-Pax;
-                Qby=Cp.y+Math.sin(Cp.B)*XYMA-Pay;
-     
-                Pm=Math.sqrt((Pbx*Pbx)+(Pby*Pby));
-     
-                ra=Math.sqrt((Qax*Qax)+(Qay*Qay));
-                rb=Math.sqrt((Qbx*Qbx)+(Qby*Qby));
-     
-                if(Math.abs(Qax)>Math.abs(ra)) exit(1);
-                Ta=Math.acos(Qax/ra);
-                if(Qay<0) Ta=-Ta;
-                Tb=Math.acos(Qbx/rb);
-                if(Qby<0) Tb=-Tb;
-                Tga=Ta-(fline.rad);
-                Tgb=Tb-(fline.rad);
-     
-                Qax=ra*Math.cos(Tga);
-                Qay=ra*Math.sin(Tga);
-                Qbx=rb*Math.cos(Tgb);
-                Qby=rb*Math.sin(Tgb);
-                Pbx=Pm;
-     
-                if((Qax-Qbx)!=0 && (Qay-Qby)!=0) {
-                    pendiente=(Qay-Qby)/(Qax-Qbx);
-                    Cx=Qax-(Qay/pendiente);
-     
-                    if (Qax>Qbx) { cond_b=(Cx>Qbx && Cx<=Qax); }
-                    else { cond_b=(Cx>=Qax && Cx<Qbx); }
-     
-                    if((Cx>=0 && Cx<=(Pbx)) && cond_b) {
-                        m=Math.sqrt((Qay*Qay)+((Qax-Cx)*(Qax-Cx))).toFixed(10);
-                        if(m>1 && (Cp.M==0 || Cp.M>m)) {
-                            Cp.M=m;
-                            Cp.Mx=(Cp.x + Cp.M * Math.cos(Cp.B))|0;
-                            Cp.My=(Cp.y + Cp.M * Math.sin(Cp.B))|0;
-                            Cp.cd=fline.rad;//float
-                        }
-                    }
-                }
-            } 
-        }
-    }
- */
-
-
-/*    function Calcular(num_onda) {
-        var A;
-        var aux_x, aux_y;//float
-        var O=OND[num_onda];
-
-        for(j=0;j<op.resolution;j++) {
-            if(Calcular.force) {
-                aux_x=Math.cos(O[j].B);
-                aux_y=Math.sin(O[j].B);
-                O[j].M = O[j].M - Math.sqrt((aux_x*aux_x)+(aux_y*aux_y));
-
-                O[j].x = O[j].x + Math.cos( O[j].B );
-                O[j].y = O[j].y + Math.sin( O[j].B );
-
-                Colision(num_onda, j);
-            }
-            else {
-                aux_x=Math.cos(O[j].B);
-                aux_y=Math.sin(O[j].B);
-                O[j].M --;
-                if (O[j].M<1) {
-                    O[j].B = 360 - O[j].B*180/PI + 2 * (O[j].cd*180/PI);//reflection angle (deg)
-                    if(O[j].B >= 360) O[j].B-=360;
-                    O[j].B=(O[j].B<180 ? O[j].B*PI/180 : ((O[j].B-360)*PI/180));//to rad
-    
-                    O[j].x = O[j].x + Math.cos( O[j].B );
-                    O[j].y = O[j].y + Math.sin( O[j].B );
-
-                    Colision(num_onda, j);
-                }    
-                else {
-                    O[j].x = O[j].x + aux_x;
-                    O[j].y = O[j].y + aux_y;
-                }
-            }
-        }
-    }
-
-//--
-    function Colision(num_onda, num_particle) {
-        var cond_b;
-        var pendiente,ra,rb,Ta,Tb,Tga,Tgb,m; //float 
-        var Qax,Qay,Qbx,Qby,Pax,Pay,Pbx,Pby,Pm,Cx; //float 
-        var Cp=OND[num_onda][num_particle];
-    
-        Cp.M=0;
-    
-        for (var i in figures) {
-            for(var j in figures[i]) {
-                fline=figures[i][j];
-                
-                Pax=(fline.x0);
-                Pay=(fline.y0);
-                Pbx=(fline.x1)-Pax;
-                Pby=(fline.y1)-Pay;
-                Qax=Cp.x-Pax;
-                Qay=Cp.y-Pay;
-                Qbx=Cp.x+Math.cos(Cp.B)*XYMA-Pax;
-                Qby=Cp.y+Math.sin(Cp.B)*XYMA-Pay;
-     
-                Pm=Math.sqrt((Pbx*Pbx)+(Pby*Pby));
-     
-                ra=Math.sqrt((Qax*Qax)+(Qay*Qay));
-                rb=Math.sqrt((Qbx*Qbx)+(Qby*Qby));
-     
-                if(Math.abs(Qax)>Math.abs(ra)) exit(1);
-                Ta=Math.acos(Qax/ra);
-                if(Qay<0) Ta=-Ta;
-                Tb=Math.acos(Qbx/rb);
-                if(Qby<0) Tb=-Tb;
-                Tga=Ta-(fline.rad);
-                Tgb=Tb-(fline.rad);
-     
-                Qax=ra*Math.cos(Tga);
-                Qay=ra*Math.sin(Tga);
-                Qbx=rb*Math.cos(Tgb);
-                Qby=rb*Math.sin(Tgb);
-                Pbx=Pm;
-     
-                if((Qax-Qbx)!=0 && (Qay-Qby)!=0) {
-                    pendiente=(Qay-Qby)/(Qax-Qbx);
-                    Cx=Qax-(Qay/pendiente);
-     
-                    if (Qax>Qbx) { cond_b=(Cx>Qbx && Cx<=Qax); }
-                    else { cond_b=(Cx>=Qax && Cx<Qbx); }
-     
-                    if ((Cx>=0 && Cx<=(Pbx))&& cond_b) {
-     
-                        m=Math.sqrt((Qay*Qay)+((Qax-Cx)*(Qax-Cx)));
-                        if(Cp.M==0 || Cp.M>m) {
-                            Cp.M=m;
-                            Cp.cd=fline.rad;//float
-                            
-                        }
-                    }
-                }
-            } 
-        }
-    }
-
- */

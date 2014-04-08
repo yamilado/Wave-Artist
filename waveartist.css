@@ -66,22 +66,6 @@ input[type='range'] {
             border: solid 1px #ED7FFF;
         }
 
-/*@-webkit-keyframes switch-green {
-  from { background-color: white;} to {background-color: rgb(163, 255, 163);}
-}
-@-webkit-keyframes switch-red {
-  from { background-color: white;} to {background-color: rgb(255, 203, 203);}
-}
-.dragging {
-  -webkit-animation: switch-green 0.5s ease-in-out 0 infinite alternate;
-}
-
-.invalid-dragging {
-  -webkit-animation: switch-red 0.5s ease-in-out 0 infinite alternate;
-}*/
-
-
-/**/
 main {
     position: relative;
     left: 5px;
@@ -136,9 +120,6 @@ aside {
     box-sizing: border-box;
 }
 
-/*
-div.menu {
-}*/
 a {
     color:#333;
     font-family:Arial;
@@ -148,8 +129,6 @@ a {
     padding-top: 14px;
 }
 
-
-    /*background-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 19px, #492412 21px,#EC9E78 30px,#F3A781 30px, #FFF0C2 53px, #BE693F 60px, #502916 63px, rgba(0, 0, 0, 0) 65px, rgba(0, 0, 0, 0) 100%);*/
 nav {
     margin: 10px 0px 10px 5px;
     width: 100%;
@@ -433,13 +412,6 @@ div.about {
     height: 300px;
     padding:50px;
 }
-    /*div.showAbouttrue {
-        -webkit-transform: translateX(0), rotate(0deg);
-        transition: -webkit-transform 1.5s ease-in-out;
-    }
-    div.showAboutfalse {
-        
-    }*/
     .about span {
         display: inline-block;
         color: #333;
@@ -475,56 +447,4 @@ div.about {
         text-align: right;
         display:block;
     }
-/*
- opacity: 0;
--webkit-transform: rotateY(-90deg) skewY(-15deg);
-box-shadow: 0px 0px 0px 0px #000000;
-transition: opacity 0.5s, -webkit-transform 0.5s;
-}
-div.parameters {
-box-sizing: border-box;
-background-image: linear-gradient(to bottom, rgba(102, 102, 102, 0.45) 0%,rgba(133, 189, 216, 0.3) 100%);
-background-color: #F0F0F0;
-width: 120%;
-height: 100%;
-border: 2px solid #999;
-border-radius: 8px;
-box-shadow: 0px 2px 0px #555555 inset, 0px -2px 0px #ffffff inset;
-margin-left: 5px;
-padding: 2px;
-z-index: 10;
-position: absolute;
-top: 0;
--webkit-transform-origin: 0 50%;
-border-left: 8px dotted #A1A1A5;
-
-[mytitle] {
-    position:relative;
-}
-    [mytitle]:after {
-        content: attr(mytitle);
-        display: block;
-        border: solid 1px #000;
-        border-radius: 4px;
-        background: rgba(0,100,200,0.8);
-        text-shadow: none;
-        color: #333;
-        font-size: 12px;
-        padding: 5px;
-        position: absolute;
-        z-index: 1000;
-        opacity:0;
-        -webkit-transition:0.25s linear opacity;
-        -webkit-transition-delay:1s;
-    }
-    nav [mytitle]:after {
-        margin: -30px 0 0 170px;
-        width: 200px;
-    }
-
-    [mytitle]:hover:after {
-        opacity:1;
-        -webkit-transition-delay:0s;
-    }
-*/
 
