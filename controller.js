@@ -20,6 +20,7 @@ function WAController($scope) {
     var YMA=549;
     var XYMA=2000; //>sqrt(XMA^2+YMA^2)
     var FIGURE_SETS={ square:4, hexagon:6, circle:50 }; //predefined set of figures with their lines' number
+	var ANIMATION_TIME=150; //time between animation frames in milliseconds
 
     $scope.POOL_WIDTH=XMA+1;
     $scope.POOL_HEIGHT=YMA+1;
@@ -106,7 +107,7 @@ function WAController($scope) {
 
 	//stored application parameters
     $scope.params = {
-		resolution:6000, 
+		resolution:5960, 
 		wlength:50, 
 		origins:1, 
 		timelapse:1, 
@@ -114,7 +115,7 @@ function WAController($scope) {
 		color_crest:'#FFFFAA', 
 		color_trough:'#000099', 
 		color_transparency:255, 
-		end_radius:2014, 
+		end_radius:2000, 
 		effect_wake:true, 
 		effect_water:false, 
 		effect_plasma:false, 
@@ -140,7 +141,7 @@ function WAController($scope) {
     
 //--
     $scope.save = function() {
-        chrome.storage.sync.set({'waveartist': $scope.params});
+        var result=chrome.storage.sync.set({'waveartist': $scope.params});
     };
 
 //--
@@ -156,7 +157,24 @@ function WAController($scope) {
             $scope.params = value.waveartist;
         } 
         else {
-            $scope.params = { resolution:6000, wlength:50, origins:1, timelapse:1, color_back:'#009999', color_crest:'#FFFFAA', color_trough:'#000099', color_transparency:255, end_radius:2014, effect_wake:true, effect_water:false, effect_plasma:false, effect_movement:false, effect_pool_border:true, effect_attenuation:false, effect_spiral:false  };
+            $scope.params = { 
+				resolution:5960, 
+				wlength:50, 
+				origins:1, 
+				timelapse:1, 
+				color_back:'#009999', 
+				color_crest:'#FFFFAA', 
+				color_trough:'#000099', 
+				color_transparency:255, 
+				end_radius:2000, 
+				effect_wake:true, 
+				effect_water:false, 
+				effect_plasma:false, 
+				effect_movement:false, 
+				effect_pool_border:true, 
+				effect_attenuation:false, 
+				effect_spiral:false
+            }
         }
         
         $scope.setParams();
@@ -889,8 +907,10 @@ function WAController($scope) {
                         }
                     }
                     if(dibujar) {
-						cfindex = Simulation.colorIndex + (Simulation.spiralAngle-(B*360/Bmax)/op.wlength);
-			    		if(cfindex>=op.wlength) cfindex-=op.wlength;
+						cfindex = Simulation.colorIndex + ((180+Simulation.spiralAngle+(B*360/Bmax))*op.wlength/360);
+			    		if(cfindex>=op.wlength) {
+							cfindex=cfindex-(op.wlength*((cfindex/op.wlength)|0));
+			    		}
 
                         //coloraux.a=alphaColor;
                         SetPixel(x, y, virtualpalette[cfindex|0]);
@@ -944,7 +964,7 @@ function WAController($scope) {
             if(WaveMovement.frame<0) WaveMovement.frame=op.wlength-1;
             
             cpool.putImageData(StartWaveMovement.framesData[WaveMovement.frame], 0, 0);
-            idTimer=setTimeout(function() {afMovement=requestAnimationFrame(WaveMovement);}, 150);
+            idTimer=setTimeout(function() {afMovement=requestAnimationFrame(WaveMovement);}, ANIMATION_TIME);
         }
         catch(e) {
             console.log(e);
