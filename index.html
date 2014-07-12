@@ -1,7 +1,7 @@
 <html ng-app ng-csp>
 <!--
 /*-----------------------------------------------------*/
-/*- Wave Artist v.0.0.0.1                 24-feb-2014 -*/
+/*- Wave Artist v.0.0.0.2                 24-feb-2014 -*/
 /*- Copyright (c) 2014 L.Yamil Martinez (G+ yamilado) -*/
 /*- Licensed under The Artistic License 2.0           -*/
 /*-----------------------------------------------------*/-->
@@ -103,7 +103,7 @@
         </div>
 
         <div class="screenDialog showDialog{{showDialog!=''}}">
-            <div class="parameters" ng-show="showDialog=='parameters'">
+            <div class="parameters" ng-show="showDialog == 'parameters'">
                 <form ng-submit="setParams() || save()">
                     <fieldset>
                         <legend>Waves</legend>
@@ -154,28 +154,28 @@
                             <span>Pool border</span>
                             <input ng-model="params.effect_pool_border" type="checkbox">
                         </div> -->
-                        <div class="row">
+                        <div class="narrow row">
                             <span>Wake</span>
                             <input ng-model="params.effect_wake" type="checkbox">
                         </div>
-                        <div class="row" ng-show="params.effect_wake && !params.effect_spiral && !params.effect_plasma && !params.effect_attenuation" title="Simulate water waves.">
+                        <div class="narrow row" ng-show="params.effect_wake && !params.effect_spiral && !params.effect_plasma && !params.effect_attenuation" title="Simulate water waves.">
                             <span>Water</span>
                             <input ng-model="params.effect_water" type="checkbox">
                         </div>
-                        <div class="row" ng-show="params.effect_wake && !params.effect_water && !params.effect_plasma && !params.effect_attenuation" title="Simulate a spiral wave.">
+                        <div class="narrow row" ng-show="params.effect_wake && !params.effect_water && !params.effect_plasma && !params.effect_attenuation" title="Simulate a spiral wave.">
                             <span>Spiral</span>
                             <input ng-model="params.effect_spiral" type="checkbox">
                         </div>
-                        <div class="row" ng-show="params.effect_wake && !params.effect_plasma && !params.effect_attenuation" title="Allow simulating of the wave's movement.">
-                            <span>Movement</span>
+                        <div class="narrow row" ng-show="params.effect_wake && !params.effect_plasma && !params.effect_attenuation" title="Allow simulating of the wave's movement.">
+                            <span>Move</span>
                             <input ng-model="params.effect_movement" type="checkbox">
                         </div>
-                        <div class="row" ng-show="params.effect_wake && !params.effect_water && !params.effect_spiral && !params.effect_movement" title="Cool color effect.">
+                        <div class="narrow row" ng-show="params.effect_wake && !params.effect_water && !params.effect_spiral && !params.effect_movement" title="Cool color effect.">
                             <span>Plasma</span>
                             <input ng-model="params.effect_plasma" type="checkbox">
                         </div>
-                        <div class="row" ng-show="params.effect_wake && !params.effect_water && !params.effect_spiral && !params.effect_movement" title="Progresive wave color attenuation.">
-                            <span>Attenuation</span>
+                        <div class="narrow row" ng-show="params.effect_wake && !params.effect_water && !params.effect_spiral && !params.effect_movement" title="Progresive wave color attenuation.">
+                            <span>Soften</span>
                             <input ng-model="params.effect_attenuation" type="checkbox">
                         </div>
                     </fieldset>

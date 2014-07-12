@@ -1,5 +1,5 @@
 /*-----------------------------------------------------*/
-/*- Wave Artist v.0.0.0.1                 24-feb-2014 -*/
+/*- Wave Artist v.0.0.0.2                 24-feb-2014 -*/
 /*- Copyright (c) 2014 L.Yamil Martinez (G+ yamilado) -*/
 /*- Licensed under The Artistic License 2.0           -*/
 /*-----------------------------------------------------*/
@@ -253,7 +253,6 @@ div.parameters {
     margin: auto;
     padding: 2px;
     z-index: 10;
-    display: inline-block;
     width: 600px;
     height: 280px;
 }
@@ -283,7 +282,7 @@ div.parameters {
             background-color: #ddd;
         }
         
-    div.row {
+     div.row {
         height: 70%;
         margin: 5px;
         display: inline-block;
@@ -312,6 +311,10 @@ div.parameters {
             padding-right: 2px;
             text-align: right;
         }
+    div.narrow { /*for narrow rows*/
+        width:50px;
+    }
+
 
     
 footer {
@@ -407,7 +410,6 @@ div.about {
     box-shadow: 0px 0px 18px 0px #FFFFFF, 0px 0px 100px 0px #F4F3F1 inset;
     margin: auto;
     z-index: 10;
-    display: inline-block;
     width: 300px;
     height: 300px;
     padding:50px;
@@ -448,3 +450,6 @@ div.about {
         display:block;
     }
 
+.ng-hide {
+    display: none!important; 
+}

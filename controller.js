@@ -1,5 +1,5 @@
 /*-----------------------------------------------------*/
-/*- Wave Artist v.0.0.0.1                 24-feb-2014 -*/
+/*- Wave Artist v.0.0.0.2                 24-feb-2014 -*/
 /*- Copyright (c) 2014 L.Yamil Martinez (G+ yamilado) -*/
 /*- Licensed under The Artistic License 2.0           -*/
 /*-----------------------------------------------------*/
@@ -125,7 +125,10 @@ function WAController($scope) {
 		effect_spiral:false 
 	};
     var op; //alias for $scope.params
-
+    var old = {
+		wlength:null, 
+		effect_wake:null, 
+	};
     
     
     
@@ -213,25 +216,26 @@ function WAController($scope) {
         }
         
         //wlength onchange resets palette
-        if(this.old_wlength!=op.wlength) {
+        if(old.wlength!=op.wlength) {
 			virtualpalette=[];
 			for(i=0; i<op.wlength; i++) {
 				virtualpalette.push(Object.create(colorRGBa));
 			}
-			CreatePalette();
 		}
+        //refresh palette
+		CreatePalette();
 
         //video buffer/s
         cpoolData= cpool.getImageData(0,0, $scope.POOL_WIDTH, $scope.POOL_HEIGHT);
        
         //wake onchange
-        if(this.old_effect_wake!=op.effect_wake) {
+        if(old.effect_wake!=op.effect_wake) {
             FillPoolWater();
         }
         
         //refresh old values
-        this.old_effect_wake=op.effect_wake;
-        this.old_wlength=op.wlength;
+        old.effect_wake=op.effect_wake;
+        old.wlength=op.wlength;
     }
 
 
